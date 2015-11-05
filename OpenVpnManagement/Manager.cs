@@ -62,9 +62,6 @@ namespace OpenVpnManagement {
             return this.SendCommand("state off");
         }
 
-
-
-
         public string GetVersion() {
             return this.SendCommand("version");
         }
@@ -89,12 +86,16 @@ namespace OpenVpnManagement {
             return this.SendCommand("help");
         }
 
-        public string Kill() {
+        public string Kill(string name) {
+            return this.SendCommand(string.Format("kill {}", name));
+        }
 
+        public string Kill(string host, int port) {
+            return this.SendCommand(string.Format("kill {}:{}", host, port));
         }
 
         public string Net() {
-
+            return this.SendCommand("net");
         }
 
 
