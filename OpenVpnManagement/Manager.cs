@@ -30,78 +30,100 @@ namespace OpenVpnManagement {
             }
         }
 
-        public String GetStatus() {
-            var a = this.SendCommand("status");
+        public string GetStatus() {
+            return this.SendCommand("status");
         }
 
-        public String GetStats() {
-            var a = this.SendCommand("load-stats"); //todo? doesn't exist?
-        }
-
-        public String GetVersion() {
-            return this.SendCommand("version");
-        }
-
-        public String GetGetPid() {
-            return this.SendCommand("pid");
-        }
-
-        public String SendSignal(Signal sgn) {
-            return this.SendCommand(string.Format("SIG{}", sgn.ToString().ToUpper());        
-        }
-
-        public String Mute() {
-            return this.SendCommand("pid");
-        }
-
-        public String GetEcho() {
-            return this.SendCommand("echo");
-        }
-
-        public String GetHelp() {
-            return this.SendCommand("help");
-        }
-
-        public String Kill() {
-
-        }
-
-        public String Net() {
-
-        }
-
-
-
-        public String GetState() {
+        /// <summary>
+        /// State
+        /// </summary>
+        /// <returns></returns>
+        public string GetState() {
             return this.SendCommand("state");
         }
 
-        public String GetState(int n) {
-            return this.SendCommand("state " + n.ToString());
+        public string GetState(int n = 1) {
+            return this.SendCommand(string.Format("state {}", n.ToString());
         }
 
-        public String GetStateAll() {
+        public string GetStateAll() {
             return this.SendCommand("state all");
         }
 
-        public String SetStateOn() {
+        public string SetStateOn() {
             return this.SendCommand("state on");
         }
 
-        public String SetStateOnAll() {
+        public string SetStateOnAll() {
             return this.SendCommand("state on all");
         }
 
-        public String SetStateOff() {
-            return this.SendCommand("state off");
-        }
-
-        public String GetLog() {
+        public string GetStateOff() {
             return this.SendCommand("state off");
         }
 
 
-        private String SendCommand(String cmd) {
+
+
+        public string GetVersion() {
+            return this.SendCommand("version");
+        }
+
+        public string GetGetPid() {
+            return this.SendCommand("pid");
+        }
+
+        public string SendSignal(Signal sgn) {
+            return this.SendCommand(string.Format("SIG{}", sgn.ToString().ToUpper());        
+        }
+
+        public string Mute() {
+            return this.SendCommand("pid");
+        }
+
+        public string GetEcho() {
+            return this.SendCommand("echo");
+        }
+
+        public string GetHelp() {
+            return this.SendCommand("help");
+        }
+
+        public string Kill() {
+
+        }
+
+        public string Net() {
+
+        }
+
+
+        /// <summary>
+        /// Logs
+        /// </summary>
+        /// <returns></returns>
+        public string GetLogAll() {
+            return this.SendCommand("state off");
+        }
+
+        public string SetLogOn() {
+            return this.SendCommand("log on");
+        }
+
+        public string SetLogOnAll() {
+            return this.SendCommand("log on all");
+        }
+
+        public string SetLogOff() {
+            return this.SendCommand("log off");
+        }
+
+        public string GetLog(int n = 1) {
+            return this.SendCommand(string.Format("log {}", n));
+        }
+
+
+        private string SendCommand(String cmd) {
             byte[] buffer = Encoding.Default.GetBytes(cmd);
             socket.Send(buffer, 0, buffer.Length, 0);
             buffer = new byte[255];
