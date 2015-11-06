@@ -7,7 +7,7 @@ using System.Net.Sockets;
 using System.Net;
 
 namespace OpenVpnManagement {
-  public class Manager {
+  public class Manager : IDisposable {
 
     public enum Signal {
       Hup,
@@ -16,9 +16,6 @@ namespace OpenVpnManagement {
       Usr2
     }
 
-    private String host;
-    private int port;
-    private int timeout;
     private Socket socket;
     private const int bufferSize = 1024;
 
@@ -96,7 +93,6 @@ namespace OpenVpnManagement {
       return this.SendCommand("net");
     }
 
-
     /// <summary>
     /// Logs
     /// </summary>
@@ -166,6 +162,12 @@ namespace OpenVpnManagement {
       }
 
       return sb.ToString();
+    }
+
+    public void Dispose() {
+      if (socket != null) {
+        socket.Dispose();
+      }
     }
   }
 }
