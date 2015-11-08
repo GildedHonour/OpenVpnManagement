@@ -7,7 +7,7 @@ A library in C# for communicating with OpenVPN Management Interface
 ```
 using (var mng = new Manager("127.0.0.1", 8888)) {
   var res1 = mng.GetPid();
-  Console.WriteLine(res);
+  Console.WriteLine(res1);
 
   var res2 = mng.GetHelp();
   Console.WriteLine(res2);

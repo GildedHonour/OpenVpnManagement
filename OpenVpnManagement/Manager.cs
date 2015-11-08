@@ -5,6 +5,8 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Net.Sockets;
 using System.Net;
+using System.Diagnostics;
+using System.IO;
 
 namespace OpenVpnManagement {
   public class Manager : IDisposable {
@@ -16,10 +18,42 @@ namespace OpenVpnManagement {
       Usr2
     }
 
+    public enum State {
+      Connecting,
+      Wait,
+      Auth,
+      GetConfig,
+      AssignIP,
+      AddRoutes,
+      Connected,
+      Reconnecting,
+      Exiting
+    }
+
     private Socket socket;
     private const int bufferSize = 1024;
+    private string? ovpnFilePath;
 
-    public Manager(String host, int port) {
+    private void RunOpenVpnProcess() {
+      Process prc = new Process();
+      prc.StartInfo.CreateNoWindow = false;
+      prc.EnableRaisingEvents = true;
+      prc.StartInfo.Arguments = string.Format("--config {}", ovpnFilePath);
+      prc.StartInfo.FileName = "openvpn.exe";
+      prc.StartInfo.WorkingDirectory = @"C:\Program Files\OpenVPN\config";
+      prc.Start();
+    }
+    public Manager(string host, int port, string? ovpnFilePath) {
+      if (ovpnFilePath != null && ovpnFilePath.ToString() != string.Empty) {
+        var ovpnFilePath2 = ovpnFilePath.ToString();
+        var res = File.ReadAllLines(ovpnFilePath2).Where(x => x == "management ");
+        if (!res.Any()) {
+          File.AppendAllText(ovpnFilePath2, string.Format("management {} {}", host, port));    
+        }
+
+        RunOpenVpnProcess();
+      }
+
       socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
       socket.Connect(host, port);
       GreetServer();
@@ -33,8 +67,9 @@ namespace OpenVpnManagement {
     /// State
     /// </summary>
     /// <returns></returns>
-    public string GetState() {
-      return this.SendCommand("state");
+    public State GetState() {
+      var res = this.SendCommand("state");
+      return State.Auth; //todo
     }
 
     public string GetState(int n = 1) {
@@ -166,6 +201,10 @@ namespace OpenVpnManagement {
 
     public void Dispose() {
       if (socket != null) {
+        if (ovpnFilePath != null && ovpnFilePath != string.Empty) {
+          SendSignal(Signal.Term);
+        }
+
         socket.Dispose();
       }
     }
