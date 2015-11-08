@@ -32,7 +32,7 @@ namespace OpenVpnManagement {
 
     private Socket socket;
     private const int bufferSize = 1024;
-    private string? ovpnFilePath;
+    private string ovpnFilePath;
 
     private void RunOpenVpnProcess() {
       Process prc = new Process();
@@ -43,12 +43,12 @@ namespace OpenVpnManagement {
       prc.StartInfo.WorkingDirectory = @"C:\Program Files\OpenVPN\config";
       prc.Start();
     }
-    public Manager(string host, int port, string? ovpnFilePath) {
-      if (ovpnFilePath != null && ovpnFilePath.ToString() != string.Empty) {
-        var ovpnFilePath2 = ovpnFilePath.ToString();
-        var res = File.ReadAllLines(ovpnFilePath2).Where(x => x == "management ");
+
+    public Manager(string host, int port, string ovpnFilePath) {
+      if (!string.IsNullOrEmpty(ovpnFilePath)) {
+        var res = File.ReadAllLines(ovpnFilePath).Where(x => x == "management ");
         if (!res.Any()) {
-          File.AppendAllText(ovpnFilePath2, string.Format("management {} {}", host, port));    
+          File.AppendAllText(ovpnFilePath, string.Format("management {} {}", host, port));    
         }
 
         RunOpenVpnProcess();
@@ -201,7 +201,7 @@ namespace OpenVpnManagement {
 
     public void Dispose() {
       if (socket != null) {
-        if (ovpnFilePath != null && ovpnFilePath != string.Empty) {
+        if (ovpnFilePath != null) {
           SendSignal(Signal.Term);
         }
 
