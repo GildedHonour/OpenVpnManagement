@@ -7,6 +7,7 @@ using System.Net.Sockets;
 using System.Net;
 using System.Diagnostics;
 using System.IO;
+using System.Threading;
 
 namespace OpenVpnManagement {
   public class Manager : IDisposable {
@@ -18,37 +19,30 @@ namespace OpenVpnManagement {
       Usr2
     }
 
-    public enum State {
-      Connecting,
-      Wait,
-      Auth,
-      GetConfig,
-      AssignIP,
-      AddRoutes,
-      Connected,
-      Reconnecting,
-      Exiting
-    }
-
     private Socket socket;
     private const int bufferSize = 1024;
-    private string ovpnFilePath;
+    private string ovpnFileName;
+    private const string eventName = "MyOpenVpnEvent";
+    Process prc;
 
     private void RunOpenVpnProcess() {
-      Process prc = new Process();
+      prc = new Process();
       prc.StartInfo.CreateNoWindow = false;
       prc.EnableRaisingEvents = true;
-      prc.StartInfo.Arguments = string.Format("--config {}", ovpnFilePath);
-      prc.StartInfo.FileName = "openvpn.exe";
-      prc.StartInfo.WorkingDirectory = @"C:\Program Files\OpenVPN\config";
+      prc.StartInfo.Arguments = string.Format("--config {0}  --service {1} 0", ovpnFileName, eventName);
+      prc.StartInfo.FileName = @"C:\Program Files\OpenVPN\bin\openvpn.exe";
       prc.Start();
     }
 
     public Manager(string host, int port, string ovpnFilePath) {
       if (!string.IsNullOrEmpty(ovpnFilePath)) {
-        var res = File.ReadAllLines(ovpnFilePath).Where(x => x == "management ");
+        if (!System.IO.Path.IsPathRooted(ovpnFilePath)) {
+          this.ovpnFileName = Path.Combine(Directory.GetCurrentDirectory(), ovpnFilePath);
+        }
+
+        var res = File.ReadAllLines(ovpnFilePath).Where(x => x.StartsWith("management "));
         if (!res.Any()) {
-          File.AppendAllText(ovpnFilePath, string.Format("management {} {}", host, port));    
+          File.AppendAllText(ovpnFilePath, string.Format("{0}management {1} {2}", Environment.NewLine, host, port.ToString()));
         }
 
         RunOpenVpnProcess();
@@ -56,7 +50,7 @@ namespace OpenVpnManagement {
 
       socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
       socket.Connect(host, port);
-      GreetServer();
+      SendGreeting();
     }
 
     public string GetStatus() {
@@ -67,13 +61,12 @@ namespace OpenVpnManagement {
     /// State
     /// </summary>
     /// <returns></returns>
-    public State GetState() {
-      var res = this.SendCommand("state");
-      return State.Auth; //todo
+    public string GetState() {
+      return this.SendCommand("state");
     }
 
     public string GetState(int n = 1) {
-      return this.SendCommand(string.Format("state {}", n.ToString()));
+      return this.SendCommand(string.Format("state {0}", n));
     }
 
     public string GetStateAll() {
@@ -101,7 +94,7 @@ namespace OpenVpnManagement {
     }
 
     public string SendSignal(Signal sgn) {
-      return this.SendCommand(string.Format("SIG{}", sgn.ToString().ToUpper()));
+      return this.SendCommand(string.Format("signal SIG{0}", sgn.ToString().ToUpper()));
     }
 
     public string Mute() {
@@ -117,11 +110,11 @@ namespace OpenVpnManagement {
     }
 
     public string Kill(string name) {
-      return this.SendCommand(string.Format("kill {}", name));
+      return this.SendCommand(string.Format("kill {0}", name));
     }
 
     public string Kill(string host, int port) {
-      return this.SendCommand(string.Format("kill {}:{}", host, port));
+      return this.SendCommand(string.Format("kill {0}:{1}", host, port));
     }
 
     public string GetNet() {
@@ -149,7 +142,7 @@ namespace OpenVpnManagement {
     }
 
     public string GetLog(int n = 1) {
-      return this.SendCommand(string.Format("log {}", n));
+      return this.SendCommand(string.Format("log {0}", n));
     }
 
     public string SendMalCommand() {
@@ -160,7 +153,7 @@ namespace OpenVpnManagement {
       return s.Replace("\0", "");
     }
 
-    private void GreetServer() {
+    private void SendGreeting() {
       var bf = new byte[bufferSize];
       int rb = socket.Receive(bf, 0, bf.Length, SocketFlags.None);
       if (rb < 1) {
@@ -170,29 +163,33 @@ namespace OpenVpnManagement {
 
     private string SendCommand(String cmd) {
       socket.Send(Encoding.Default.GetBytes(cmd + "\r\n"));
-
       var bf = new byte[bufferSize];
       var sb = new System.Text.StringBuilder();
       int rb;
-      string s = "";
+      string str = "";
       while (true) {
+        Thread.Sleep(100);
         rb = socket.Receive(bf, 0, bf.Length, 0);
-        s = Encoding.UTF8.GetString(bf).Replace("\0", "");
+        str = Encoding.UTF8.GetString(bf).Replace("\0", "");
         if (rb < bf.Length) {
-          if (s.Contains("\r\nEND")) {
-            var a = s.Substring(0, s.IndexOf("\r\nEND"));
+          if (str.Contains("\r\nEND")) {
+            var a = str.Substring(0, str.IndexOf("\r\nEND"));
             sb.Append(a);
-          } else if (s.Contains("SUCCESS: ")) {
-            var a = s.Replace("SUCCESS: ", "").Replace("\r\n", "");
+          } else if (str.Contains("SUCCESS: ")) {
+            var a = str.Replace("SUCCESS: ", "").Replace("\r\n", "");
             sb.Append(a);
-          } else if (s.Contains("ERROR: ")) {
-            var msg = s.Replace("ERROR: ", "").Replace("\r\n", "");
+          } else if (str.Contains("ERROR: ")) {
+            var msg = str.Replace("ERROR: ", "").Replace("\r\n", "");
             throw new ArgumentException(msg);
+          } else {
+
+            //todo
+            continue;
           }
 
           break;
         } else {
-          sb.Append(s);
+          sb.Append(str);
         }
       }
 
@@ -201,11 +198,12 @@ namespace OpenVpnManagement {
 
     public void Dispose() {
       if (socket != null) {
-        if (ovpnFilePath != null) {
+        if (ovpnFileName != null) {
           SendSignal(Signal.Term);
         }
 
         socket.Dispose();
+        prc.Close();
       }
     }
   }
