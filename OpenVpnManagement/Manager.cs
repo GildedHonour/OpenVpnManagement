@@ -8,6 +8,7 @@ using System.Net;
 using System.Diagnostics;
 using System.IO;
 using System.Threading;
+using System.IO;
 
 namespace OpenVpnManagement {
   public class Manager : IDisposable {
@@ -19,30 +20,56 @@ namespace OpenVpnManagement {
       Usr2
     }
 
-    private Socket socket;
-    private const int bufferSize = 1024;
-    private string ovpnFileName;
-    private const string eventName = "MyOpenVpnEvent";
+    Socket socket;
+    const int bufferSize = 1024;
+    string ovpnFileName;
+    const string eventName = "MyOpenVpnEvent";
     Process prc;
+    readonly string openVpnExePath;
+    bool isPassFileAdded = false;
 
     private void RunOpenVpnProcess() {
       prc = new Process();
       prc.StartInfo.CreateNoWindow = false;
       prc.EnableRaisingEvents = true;
       prc.StartInfo.Arguments = string.Format("--config {0}  --service {1} 0", ovpnFileName, eventName);
-      prc.StartInfo.FileName = @"C:\Program Files\OpenVPN\bin\openvpn.exe";
+      prc.StartInfo.FileName = openVpnExePath;
       prc.Start();
     }
 
-    public Manager(string host, int port, string ovpnFilePath) {
-      if (!string.IsNullOrEmpty(ovpnFilePath)) {
-        if (!System.IO.Path.IsPathRooted(ovpnFilePath)) {
-          this.ovpnFileName = Path.Combine(Directory.GetCurrentDirectory(), ovpnFilePath);
+    public Manager(string host, int port, string ovpnFileName, string? userName = null, string? password = null, string openVpnExeFileName = @"C:\Program Files\OpenVPN\bin\openvpn.exe") {
+      this.openVpnExePath = openVpnExeFileName;
+      if (!string.IsNullOrEmpty(ovpnFileName)) {
+        if (!Path.IsPathRooted(ovpnFileName)) {
+          this.ovpnFileName = Path.Combine(Directory.GetCurrentDirectory(), ovpnFileName);
         }
 
-        var res = File.ReadAllLines(ovpnFilePath).Where(x => x.StartsWith("management "));
-        if (!res.Any()) {
-          File.AppendAllText(ovpnFilePath, string.Format("{0}management {1} {2}", Environment.NewLine, host, port.ToString()));
+        var ovpnFileLines = File.ReadAllLines(ovpnFileName);
+
+        //management
+        if (!ovpnFileLines.Where(x => x.StartsWith("management")).Any()) {
+          File.AppendAllText(ovpnFileName, string.Format("{0}management {1} {2}", Environment.NewLine, host, port.ToString()));
+        }
+
+        //auto login
+        var maybeAuthUserPass = ovpnFileLines.Where(x => x.StartsWith("auth-user-pass"));
+        var passFileName = Path.Combine(Path.GetTempPath(), "ovpnpass.txt");
+        if (maybeAuthUserPass.Any()) {
+          if (userName == null || password == null) {
+            throw new ArgumentException("Username or password cannot be null");
+          }
+
+          // create a credentials file
+          File.WriteAllLines(passFileName, new string[] { userName.Value, password.Value });
+
+          // add its path the ovpn file and write it back to the ovpn file
+          var idx = Array.FindIndex(ovpnFileLines, x => x.StartsWith("auth-user-pass"));
+          ovpnFileLines[idx] = string.Format("auth-user-pass {0}", passFileName);
+          File.WriteAllLines(ovpnFileName, ovpnFileLines);
+        } else {
+          if (userName != null || password != null) {
+            throw new ArgumentException("Username or password are provided but the *.ovpn file doesn't have the line 'auth-user-pass'");
+          }
         }
 
         RunOpenVpnProcess();
@@ -57,10 +84,6 @@ namespace OpenVpnManagement {
       return this.SendCommand("status");
     }
 
-    /// <summary>
-    /// State
-    /// </summary>
-    /// <returns></returns>
     public string GetState() {
       return this.SendCommand("state");
     }
@@ -121,10 +144,6 @@ namespace OpenVpnManagement {
       return this.SendCommand("net");
     }
 
-    /// <summary>
-    /// Logs
-    /// </summary>
-    /// <returns></returns>
     public string GetLogAll() {
       return this.SendCommand("state off");
     }
@@ -201,10 +220,12 @@ namespace OpenVpnManagement {
         if (ovpnFileName != null) {
           SendSignal(Signal.Term);
         }
-
-        socket.Dispose();
-        prc.Close();
       }
+
+      socket.Dispose();
+      EventWaitHandle resetEvent = EventWaitHandle.OpenExisting(eventName);
+      resetEvent.Set();
+      prc.Close();
     }
   }
 }
