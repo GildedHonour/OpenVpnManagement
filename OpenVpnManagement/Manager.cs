@@ -45,28 +45,28 @@ namespace OpenVpnManagement {
         var ovpnFileContent = File.ReadAllLines(ovpnFileName);
 
         //management
-        if (!ovpnFileContent.Where(x => x.StartsWith("management")).Any()) {
+        var idx = Array.FindIndex(ovpnFileContent, x => x.StartsWith("management"));
+        if (idx >= 0) {
+          ovpnFileContent[idx] = string.Format("management {0} {1}", host, port);
+        } else {
           var lastIdx = ovpnFileContent.Length - 1;
           var lastLine = ovpnFileContent[lastIdx];
           ovpnFileContent[lastIdx] = string.Format("{0}{1}management {2} {3}", lastLine, Environment.NewLine, host, port);
-        } else {
-          var idx = Array.IndexOf(ovpnFileContent, ovpnFileContent.First(x => x.StartsWith("management")));
-          ovpnFileContent[idx] = string.Format("management {0} {1}", host, port);
         }
 
         //auto login
-        var passFileName = Path.Combine(Path.GetTempPath(), "ovpnpass.txt").Replace(@"\", @"\\");
-        if (ovpnFileContent.Where(x => x.StartsWith("auth-user-pass")).Any()) {
+        var idx2 = Array.FindIndex(ovpnFileContent, x => x.StartsWith("auth-user-pass"));
+        if (idx2 >= 0) {
           if (userName == null || password == null) {
             throw new ArgumentException("Username or password cannot be null");
           }
 
           // create a credentials file
+          var passFileName = Path.Combine(Path.GetTempPath(), "ovpnpass.txt").Replace(@"\", @"\\");
           File.WriteAllLines(passFileName, new string[] { userName, password });
 
           // add its path the ovpn file and write it back to the ovpn file
-          var idx = Array.FindIndex(ovpnFileContent, x => x.StartsWith("auth-user-pass"));
-          ovpnFileContent[idx] = string.Format("auth-user-pass {0}", passFileName);
+          ovpnFileContent[idx2] = string.Format("auth-user-pass {0}", passFileName);
         } else {
           if (userName != null || password != null) {
             throw new ArgumentException("Username or password are provided but the *.ovpn file doesn't have the line 'auth-user-pass'");
