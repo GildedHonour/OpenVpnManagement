@@ -20,52 +20,52 @@ namespace OpenVpnManagement {
       Usr2
     }
 
-    Socket socket;
-    const int bufferSize = 1024;
-    string ovpnFileName;
-    const string eventName = "MyOpenVpnEvent";
-    Process prc;
-    readonly string openVpnExePath;
-    bool isPassFileAdded = false;
+    private Socket socket;
+    private const int bufferSize = 1024;
+    private string ovpnFileName;
+    private const string eventName = "MyOpenVpnEvent";
+    private readonly Process prc = new Process();
+    private readonly string openVpnExePath;
 
     private void RunOpenVpnProcess() {
-      prc = new Process();
       prc.StartInfo.CreateNoWindow = false;
       prc.EnableRaisingEvents = true;
-      prc.StartInfo.Arguments = string.Format("--config {0}  --service {1} 0", ovpnFileName, eventName);
+      prc.StartInfo.Arguments = string.Format("--config {0} --service {1} 0", ovpnFileName, eventName);
       prc.StartInfo.FileName = openVpnExePath;
       prc.Start();
     }
 
-    public Manager(string host, int port, string ovpnFileName, string? userName = null, string? password = null, string openVpnExeFileName = @"C:\Program Files\OpenVPN\bin\openvpn.exe") {
+    public Manager(string host, int port, string ovpnFileName, string userName = null, string password = null, string openVpnExeFileName = @"C:\Program Files\OpenVPN\bin\openvpn.exe") {
       this.openVpnExePath = openVpnExeFileName;
       if (!string.IsNullOrEmpty(ovpnFileName)) {
         if (!Path.IsPathRooted(ovpnFileName)) {
           this.ovpnFileName = Path.Combine(Directory.GetCurrentDirectory(), ovpnFileName);
         }
 
-        var ovpnFileLines = File.ReadAllLines(ovpnFileName);
+        var ovpnFileContent = File.ReadAllLines(ovpnFileName);
 
         //management
-        if (!ovpnFileLines.Where(x => x.StartsWith("management")).Any()) {
+        if (!ovpnFileContent.Where(x => x.StartsWith("management")).Any()) {
           File.AppendAllText(ovpnFileName, string.Format("{0}management {1} {2}", Environment.NewLine, host, port.ToString()));
+        } else {
+          var idx = Array.IndexOf(ovpnFileContent, ovpnFileContent.First(x => x.StartsWith("management")));
+          ovpnFileContent[idx] = string.Format("management {0} {1}", host, port.ToString());
         }
 
         //auto login
-        var maybeAuthUserPass = ovpnFileLines.Where(x => x.StartsWith("auth-user-pass"));
-        var passFileName = Path.Combine(Path.GetTempPath(), "ovpnpass.txt");
-        if (maybeAuthUserPass.Any()) {
+        var passFileName = Path.Combine(Path.GetTempPath(), "ovpnpass.txt").Replace(@"\", @"\\");
+        if (ovpnFileContent.Where(x => x.StartsWith("auth-user-pass")).Any()) {
           if (userName == null || password == null) {
             throw new ArgumentException("Username or password cannot be null");
           }
 
           // create a credentials file
-          File.WriteAllLines(passFileName, new string[] { userName.Value, password.Value });
+          File.WriteAllLines(passFileName, new string[] { userName, password });
 
           // add its path the ovpn file and write it back to the ovpn file
-          var idx = Array.FindIndex(ovpnFileLines, x => x.StartsWith("auth-user-pass"));
-          ovpnFileLines[idx] = string.Format("auth-user-pass {0}", passFileName);
-          File.WriteAllLines(ovpnFileName, ovpnFileLines);
+          var idx = Array.FindIndex(ovpnFileContent, x => x.StartsWith("auth-user-pass"));
+          ovpnFileContent[idx] = string.Format("auth-user-pass {0}", passFileName);
+          File.WriteAllLines(ovpnFileName, ovpnFileContent);
         } else {
           if (userName != null || password != null) {
             throw new ArgumentException("Username or password are provided but the *.ovpn file doesn't have the line 'auth-user-pass'");
@@ -80,6 +80,7 @@ namespace OpenVpnManagement {
       SendGreeting();
     }
 
+    #region Commands
     public string GetStatus() {
       return this.SendCommand("status");
     }
@@ -179,6 +180,7 @@ namespace OpenVpnManagement {
         throw new SocketException();
       }
     }
+    #endregion
 
     private string SendCommand(String cmd) {
       socket.Send(Encoding.Default.GetBytes(cmd + "\r\n"));
@@ -201,7 +203,6 @@ namespace OpenVpnManagement {
             var msg = str.Replace("ERROR: ", "").Replace("\r\n", "");
             throw new ArgumentException(msg);
           } else {
-
             //todo
             continue;
           }
@@ -223,8 +224,6 @@ namespace OpenVpnManagement {
       }
 
       socket.Dispose();
-      EventWaitHandle resetEvent = EventWaitHandle.OpenExisting(eventName);
-      resetEvent.Set();
       prc.Close();
     }
   }
