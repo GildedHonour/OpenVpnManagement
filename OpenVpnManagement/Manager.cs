@@ -46,7 +46,9 @@ namespace OpenVpnManagement {
 
         //management
         if (!ovpnFileContent.Where(x => x.StartsWith("management")).Any()) {
-          File.AppendAllText(ovpnFileName, string.Format("{0}management {1} {2}", Environment.NewLine, host, port.ToString()));
+          var lastIdx = ovpnFileContent.Length - 1;
+          var lastLine = ovpnFileContent[lastIdx];
+          ovpnFileContent[lastIdx] = string.Format("{0}{1}management {2} {3}", lastLine, Environment.NewLine, host, port);
         } else {
           var idx = Array.IndexOf(ovpnFileContent, ovpnFileContent.First(x => x.StartsWith("management")));
           ovpnFileContent[idx] = string.Format("management {0} {1}", host, port.ToString());
