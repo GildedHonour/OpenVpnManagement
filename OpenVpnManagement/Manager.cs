@@ -51,7 +51,7 @@ namespace OpenVpnManagement {
           ovpnFileContent[lastIdx] = string.Format("{0}{1}management {2} {3}", lastLine, Environment.NewLine, host, port);
         } else {
           var idx = Array.IndexOf(ovpnFileContent, ovpnFileContent.First(x => x.StartsWith("management")));
-          ovpnFileContent[idx] = string.Format("management {0} {1}", host, port.ToString());
+          ovpnFileContent[idx] = string.Format("management {0} {1}", host, port);
         }
 
         //auto login
