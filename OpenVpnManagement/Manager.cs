@@ -67,13 +67,13 @@ namespace OpenVpnManagement {
           // add its path the ovpn file and write it back to the ovpn file
           var idx = Array.FindIndex(ovpnFileContent, x => x.StartsWith("auth-user-pass"));
           ovpnFileContent[idx] = string.Format("auth-user-pass {0}", passFileName);
-          File.WriteAllLines(ovpnFileName, ovpnFileContent);
         } else {
           if (userName != null || password != null) {
             throw new ArgumentException("Username or password are provided but the *.ovpn file doesn't have the line 'auth-user-pass'");
           }
         }
 
+        File.WriteAllLines(ovpnFileName, ovpnFileContent);
         RunOpenVpnProcess();
       }
 
